@@ -1,21 +1,21 @@
-const express = require('express');
 const nodemailer = require('nodemailer');
-
-const app = express();
-const port = 5000;
-
-// Express "Hello, World!" route
-app.get('/', (req, res) => {
-  res.send('Hello, World!');
-});
+const Queue1 = require('bull');
 
 // Nodemailer setup for sending emails
 const emailTransporter = nodemailer.createTransport({
   service: 'Gmail', // Change to your email provider
   auth: {
     user: 'roysoumodip507@gmail.com', // Your email address
-    pass: 'pzno bknv jdug drjp', // Your email password
+    pass: 'bxgv krqj yxmo hcrc', // Your email password
   },
+});
+
+const queue = new Queue1('emailQueue', {
+  redis: {
+    port: 6379,
+    host: 'localhost'
+  }
+
 });
 
 const emailData = {
@@ -24,26 +24,33 @@ const emailData = {
   text: 'Subha Vijaya to all!',
 };
 
-// An array of email addresses to send the email to
-const recipients = ['roysoumodip507@gmail.com', 'sayantanghosh20000@gmail.com', /* Add all your email addresses here */];
+const sendEmail = async (email) => {
+  console.log(`Sending email to ${email}`);
+
+  emailData.to = email; 
+
+  try {
+    const info = await emailTransporter.sendMail(emailData);
+    console.log(`Email sent to ${email}: ${info.response}`);
+  } catch (error) {
+    console.error(`Failed to send email to ${email}: ${error}`);
+  }
+};
+
+
+const recipients = ['roysoumodip507@gmail.com', 'sayantanghosh20000@gmail.com'];
 
 // Express route to send "Subha Vijaya" email to multiple recipients
-app.get('/send-email', (req, res) => {
-  recipients.forEach((recipient) => {
-    emailData.to = recipient;
-
-    emailTransporter.sendMail(emailData, (error, info) => {
-      if (error) {
-        console.error(`Error sending email to ${recipient}: ${error.message}`);
-      } else {
-        console.log(`Email sent to ${recipient}: ${info.response}`);
-      }
-    });
-  });
-
-  res.send('Emails are being sent to recipients. Check the console for progress.');
+recipients.forEach((recipient) => {
+  queue.add(recipient);
+  console.log(`Added recipient ${recipient} to the queue`);
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+console.log('Processing emails...');
+
+queue.process(async (job,done) => {
+  await sendEmail(job.data);
+  done()
+  
 });
+
